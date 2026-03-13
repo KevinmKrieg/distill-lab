@@ -1,0 +1,31 @@
+seed: 42
+output_dir: results/student_scratch_toy
+
+data:
+  type: toy
+  train_samples: 4000
+  val_samples: 600
+  batch_size: 32
+  max_seq_len: 20
+  num_workers: 0
+
+model:
+  d_model: 64
+  n_heads: 4
+  n_layers: 2
+  ff_mult: 4
+  dropout: 0.1
+
+training:
+  mode: student
+  epochs: 8
+  lr: 0.0003
+  weight_decay: 0.01
+  grad_clip: 1.0
+  log_every: 20
+
+distillation:
+  temperature: 2.0
+  alpha: 0.7
+  hidden_loss_weight: 0.0
+

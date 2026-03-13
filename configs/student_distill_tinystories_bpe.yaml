@@ -1,0 +1,45 @@
+seed: 42
+output_dir: results/student_distill_tinystories_bpe
+
+data:
+  type: text
+  name: tinystories
+  train_path: data/tinystories/train.txt
+  val_path: data/tinystories/val.txt
+  batch_size: 32
+  max_seq_len: 128
+  stride: 64
+  num_workers: 0
+  tokenizer:
+    level: bpe
+    vocab_size: 1024
+    min_frequency: 2
+    model_path: artifacts/tokenizers/tinystories_bpe.json
+
+teacher_model:
+  d_model: 256
+  n_heads: 8
+  n_layers: 4
+  ff_mult: 4
+  dropout: 0.1
+
+student_model:
+  d_model: 128
+  n_heads: 4
+  n_layers: 2
+  ff_mult: 4
+  dropout: 0.1
+
+training:
+  mode: distill
+  epochs: 10
+  lr: 0.0003
+  weight_decay: 0.01
+  grad_clip: 1.0
+  log_every: 20
+
+distillation:
+  teacher_checkpoint: results/teacher_tinystories_bpe/best.pt
+  temperature: 3.0
+  alpha: 0.8
+  hidden_loss_weight: 0.05

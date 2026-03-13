@@ -1,0 +1,34 @@
+seed: 42
+output_dir: results/teacher_shakespeare_char
+
+data:
+  type: text
+  name: tiny_shakespeare
+  train_path: data/tiny_shakespeare/train.txt
+  val_path: data/tiny_shakespeare/val.txt
+  batch_size: 32
+  max_seq_len: 96
+  stride: 48
+  num_workers: 0
+  tokenizer:
+    level: char
+
+model:
+  d_model: 192
+  n_heads: 6
+  n_layers: 4
+  ff_mult: 4
+  dropout: 0.1
+
+training:
+  mode: teacher
+  epochs: 12
+  lr: 0.0003
+  weight_decay: 0.01
+  grad_clip: 1.0
+  log_every: 20
+
+distillation:
+  temperature: 2.0
+  alpha: 0.7
+  hidden_loss_weight: 0.0

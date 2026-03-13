@@ -1,0 +1,39 @@
+seed: 42
+output_dir: results/student_distill_toy
+
+data:
+  type: toy
+  train_samples: 4000
+  val_samples: 600
+  batch_size: 32
+  max_seq_len: 20
+  num_workers: 0
+
+teacher_model:
+  d_model: 128
+  n_heads: 4
+  n_layers: 4
+  ff_mult: 4
+  dropout: 0.1
+
+student_model:
+  d_model: 64
+  n_heads: 4
+  n_layers: 2
+  ff_mult: 4
+  dropout: 0.1
+
+training:
+  mode: distill
+  epochs: 8
+  lr: 0.0003
+  weight_decay: 0.01
+  grad_clip: 1.0
+  log_every: 20
+
+distillation:
+  teacher_checkpoint: results/teacher_toy/best.pt
+  temperature: 3.0
+  alpha: 0.8
+  hidden_loss_weight: 0.05
+

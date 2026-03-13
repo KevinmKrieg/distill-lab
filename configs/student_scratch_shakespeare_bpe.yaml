@@ -1,0 +1,37 @@
+seed: 42
+output_dir: results/student_scratch_shakespeare_bpe
+
+data:
+  type: text
+  name: tiny_shakespeare
+  train_path: data/tiny_shakespeare/train.txt
+  val_path: data/tiny_shakespeare/val.txt
+  batch_size: 32
+  max_seq_len: 96
+  stride: 48
+  num_workers: 0
+  tokenizer:
+    level: bpe
+    vocab_size: 320
+    min_frequency: 2
+    model_path: artifacts/tokenizers/tiny_shakespeare_bpe.json
+
+model:
+  d_model: 96
+  n_heads: 4
+  n_layers: 2
+  ff_mult: 4
+  dropout: 0.1
+
+training:
+  mode: student
+  epochs: 12
+  lr: 0.0003
+  weight_decay: 0.01
+  grad_clip: 1.0
+  log_every: 20
+
+distillation:
+  temperature: 2.0
+  alpha: 0.7
+  hidden_loss_weight: 0.0
