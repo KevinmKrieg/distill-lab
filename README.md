@@ -29,6 +29,7 @@ The repo now supports three data/tokenization paths:
 - YAML configs for toy, Shakespeare, WikiText-2, and TinyStories experiments
 - Checkpointing and JSONL metric logging
 - Standalone evaluation entrypoint
+- Run summarization into CSV, Markdown tables, and SVG learning-curve plots
 
 ## Project layout
 
@@ -52,11 +53,13 @@ distill-lab/
     run_eval.sh
     prepare_wikitext2.py
     prepare_tinystories.py
+    summarize_runs.py
   src/
     data.py
     eval.py
     losses.py
     models.py
+    reporting.py
     train.py
     utils.py
 ```
@@ -95,6 +98,29 @@ python -m src.eval --config configs/student_distill_shakespeare_bpe.yaml
 ```
 
 The first BPE run will create `artifacts/tokenizers/tiny_shakespeare_bpe.json`. Later runs reuse it.
+
+## Summarizing experiments
+
+After you have completed one or more runs, generate a comparison table and learning-curve plots:
+
+```bash
+python scripts/summarize_runs.py \
+  results/teacher_shakespeare_bpe \
+  results/student_scratch_shakespeare_bpe \
+  results/student_distill_shakespeare_bpe \
+  --labels teacher scratch distill \
+  --output-dir results/reports/shakespeare_bpe
+```
+
+This writes:
+
+- `summary.csv`
+- `summary.md`
+- `plots/val_perplexity.svg`
+- `plots/val_token_accuracy.svg`
+- `plots/train_loss.svg`
+
+The generated Markdown table is suitable for pasting into the README or a PR comment once you have stable runs.
 
 ## Preparing WikiText-2
 
@@ -180,6 +206,12 @@ Each run writes into its configured `output_dir`:
 - `best.pt`: best checkpoint by validation perplexity
 - `last.pt`: final epoch checkpoint
 - `metrics.jsonl`: per-epoch training and validation metrics
+
+Summary commands can additionally write:
+
+- `summary.csv`
+- `summary.md`
+- `plots/*.svg`
 
 ## Notes
 

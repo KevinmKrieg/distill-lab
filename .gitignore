@@ -7,3 +7,4 @@ venv/
 results/
 checkpoints/
 artifacts/tokenizers/*.json
+results/reports/
