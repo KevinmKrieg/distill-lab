@@ -2,127 +2,36 @@
 
 PyTorch project for teacher-student language model distillation.
 
-The repo now supports three data/tokenization paths:
+This repo is built to answer a simple question: how much of a larger language model can you preserve in a smaller student when you distill logits, hard labels, and optional hidden states? The codebase is intentionally small, config-driven, and easy to run locally.
 
-- a synthetic toy corpus for fast smoke tests
-- local text corpora with character or word tokenization
-- local text corpora with a native byte-level BPE tokenizer that can be trained and persisted from your training split
+## Usage examples
 
-## What is implemented
+### 1. Fast smoke test
 
-- Teacher training with standard next-token cross-entropy
-- Student baseline training from scratch
-- Student distillation with:
-  - softened teacher logits via KL divergence
-  - hard-label cross-entropy on ground-truth next tokens
-  - optional hidden-state matching through a learned projection
-- Dataset backends for:
-  - synthetic template data
-  - line-based text corpora from local files
-- Tokenizer support for:
-  - character-level tokenization
-  - word-level tokenization with frequency filtering
-  - byte-level BPE tokenization with saved tokenizer models
-- Dataset preparation scripts for:
-  - WikiText-2
-  - TinyStories
-- YAML configs for toy, Shakespeare, WikiText-2, and TinyStories experiments
-- Checkpointing and JSONL metric logging
-- Standalone evaluation entrypoint
-- Run summarization into CSV, Markdown tables, and SVG learning-curve plots
-
-## Project layout
-
-```text
-distill-lab/
-  artifacts/
-    tokenizers/
-  configs/
-    teacher_toy.yaml
-    teacher_shakespeare_char.yaml
-    teacher_shakespeare_bpe.yaml
-    teacher_wikitext2_bpe.yaml
-    teacher_tinystories_bpe.yaml
-    ...
-  data/
-    tiny_shakespeare/
-      train.txt
-      val.txt
-  scripts/
-    run_train.sh
-    run_eval.sh
-    prepare_wikitext2.py
-    prepare_tinystories.py
-    summarize_runs.py
-  src/
-    data.py
-    eval.py
-    losses.py
-    models.py
-    reporting.py
-    train.py
-    utils.py
-```
-
-## Quick start
-
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-Synthetic smoke test:
+Run the full teacher vs student-from-scratch vs distilled-student workflow on a synthetic corpus:
 
 ```bash
 python -m src.train --config configs/teacher_toy.yaml
 python -m src.train --config configs/student_scratch_toy.yaml
 python -m src.train --config configs/student_distill_toy.yaml
+python scripts/summarize_runs.py   results/teacher_toy   results/student_scratch_toy   results/student_distill_toy   --labels teacher scratch distill   --output-dir results/reports/toy
 ```
 
-Real-text char tokenizer run on the checked-in Shakespeare sample:
+### 2. Real-text distillation with subword tokenization
 
-```bash
-python -m src.train --config configs/teacher_shakespeare_char.yaml
-python -m src.train --config configs/student_scratch_shakespeare_char.yaml
-python -m src.train --config configs/student_distill_shakespeare_char.yaml
-```
-
-Real-text subword run on the same corpus:
+Train a larger teacher and smaller student on the checked-in Tiny Shakespeare corpus using the repo's byte-level BPE tokenizer:
 
 ```bash
 python -m src.train --config configs/teacher_shakespeare_bpe.yaml
 python -m src.train --config configs/student_scratch_shakespeare_bpe.yaml
 python -m src.train --config configs/student_distill_shakespeare_bpe.yaml
 python -m src.eval --config configs/student_distill_shakespeare_bpe.yaml
+python scripts/summarize_runs.py   results/teacher_shakespeare_bpe   results/student_scratch_shakespeare_bpe   results/student_distill_shakespeare_bpe   --labels teacher scratch distill   --output-dir results/reports/shakespeare_bpe
 ```
 
-The first BPE run will create `artifacts/tokenizers/tiny_shakespeare_bpe.json`. Later runs reuse it.
+### 3. Open-data workflow for larger experiments
 
-## Summarizing experiments
-
-After you have completed one or more runs, generate a comparison table and learning-curve plots:
-
-```bash
-python scripts/summarize_runs.py \
-  results/teacher_shakespeare_bpe \
-  results/student_scratch_shakespeare_bpe \
-  results/student_distill_shakespeare_bpe \
-  --labels teacher scratch distill \
-  --output-dir results/reports/shakespeare_bpe
-```
-
-This writes:
-
-- `summary.csv`
-- `summary.md`
-- `plots/val_perplexity.svg`
-- `plots/val_token_accuracy.svg`
-- `plots/train_loss.svg`
-
-The generated Markdown table is suitable for pasting into the README or a PR comment once you have stable runs.
-
-## Preparing WikiText-2
+Prepare a standard open corpus, then run the same teacher/student/distillation pipeline:
 
 ```bash
 python scripts/prepare_wikitext2.py
@@ -131,15 +40,7 @@ python -m src.train --config configs/student_scratch_wikitext2_bpe.yaml
 python -m src.train --config configs/student_distill_wikitext2_bpe.yaml
 ```
 
-If you already have the extracted dataset locally:
-
-```bash
-python scripts/prepare_wikitext2.py --source-dir /path/to/wikitext-2
-```
-
-## Preparing TinyStories
-
-If you have local TinyStories JSON or JSONL shards:
+Or normalize local TinyStories shards into `train.txt` and `val.txt` first:
 
 ```bash
 python scripts/prepare_tinystories.py --source-dir /path/to/TinyStories
@@ -148,73 +49,52 @@ python -m src.train --config configs/student_scratch_tinystories_bpe.yaml
 python -m src.train --config configs/student_distill_tinystories_bpe.yaml
 ```
 
-If you have a local archive instead:
+## Open-source model use case
 
-```bash
-python scripts/prepare_tinystories.py --archive /path/to/TinyStories.tar.gz
-```
+The intended next step is distilling a pretrained open model such as `gpt2` or a SmolLM-style teacher into a smaller custom student on WikiText-2 or TinyStories. This repo already has the reusable pieces for that workflow:
 
-The TinyStories prep script can also download from a URL if you supply `--download-url`, but I did not exercise that path in this environment.
+- teacher-student distillation loss with KL, CE, and hidden-state matching
+- local BPE tokenization and text chunking
+- experiment summaries, comparison tables, and SVG plots
+- configs for open corpora that mirror a real language-model distillation setup
 
-## Data configuration
+What is not added yet is the adapter layer for loading logits and hidden states from a pretrained external teacher checkpoint. The current configs train the teacher locally.
 
-`data.type: toy` uses the deterministic synthetic corpus.
+## Example output
 
-`data.type: text` reads `train_path` and `val_path`, builds the tokenizer on the training split, and chunks tokenized lines into causal language-model sequences.
+Below is a real validation-perplexity plot produced by the reporting script from a verified local smoke run. All three runs improve over training, and the teacher improves fastest on this tiny setup.
 
-Example BPE config:
+![Validation perplexity curve](docs/assets/report_smoke_val_perplexity.svg)
 
-```yaml
-data:
-  type: text
-  name: wikitext2
-  train_path: data/wikitext2/train.txt
-  val_path: data/wikitext2/val.txt
-  batch_size: 32
-  max_seq_len: 128
-  stride: 64
-  num_workers: 0
-  tokenizer:
-    level: bpe
-    vocab_size: 512
-    min_frequency: 2
-    model_path: artifacts/tokenizers/wikitext2_bpe.json
-```
+Example summary from that run:
 
-Supported tokenizer configs:
+| run | best val ppl | best val acc | params |
+| --- | ---: | ---: | ---: |
+| teacher | 26.0278 | 0.2137 | 12053 |
+| scratch | 39.5372 | 0.1183 | 4005 |
+| distill | 41.8707 | 0.0878 | 4005 |
 
-- `level: char`
-- `level: word`
-- `level: bpe`
-- `lowercase`, `min_freq`, and `max_vocab_size` for word tokenization
-- `vocab_size`, `min_frequency`, and `model_path` for BPE tokenization
+## What the repo includes
 
-## Training objective
+- teacher training, student baseline training, and student distillation
+- synthetic, char-tokenized, word-tokenized, and BPE-tokenized data paths
+- dataset prep scripts for WikiText-2 and TinyStories
+- reporting tools that write `summary.csv`, `summary.md`, and SVG plots
+- YAML configs for toy, Shakespeare, WikiText-2, and TinyStories experiments
+
+## Minimal project map
 
 ```text
-L = alpha * T^2 * KL(softmax(z_t / T), softmax(z_s / T))
-  + (1 - alpha) * CE(y, z_s)
-  + hidden_loss_weight * MSE(W h_s, h_t)
+configs/   experiment definitions
+scripts/   dataset prep and reporting CLIs
+src/       training, evaluation, tokenization, and losses
+data/      local corpora
+artifacts/ saved tokenizer models
+results/   checkpoints and metrics
 ```
-
-Where `W` projects student hidden states into the teacher hidden size when hidden matching is enabled.
-
-## Outputs
-
-Each run writes into its configured `output_dir`:
-
-- `best.pt`: best checkpoint by validation perplexity
-- `last.pt`: final epoch checkpoint
-- `metrics.jsonl`: per-epoch training and validation metrics
-
-Summary commands can additionally write:
-
-- `summary.csv`
-- `summary.md`
-- `plots/*.svg`
 
 ## Notes
 
-- The BPE tokenizer is implemented locally in `src/data.py`; no external tokenization library is required.
-- WikiText-2 and TinyStories configs assume you have prepared `train.txt` and `val.txt` with the provided scripts.
-- Only the Shakespeare-based char and BPE paths were exercised locally in this environment. The remote dataset preparation paths were added but not executed because network access is restricted here.
+- The first BPE run will create a tokenizer model under `artifacts/tokenizers/` and later runs will reuse it.
+- `scripts/summarize_runs.py` turns `metrics.jsonl` files into CSV, Markdown, and SVG artifacts.
+- The Shakespeare char and BPE paths were exercised locally in this environment. The remote dataset download flows were added but not executed here because network access is restricted.

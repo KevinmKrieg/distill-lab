@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="420" viewBox="0 0 900 420">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="450.0" y="24" text-anchor="middle" font-size="18" font-family="monospace">Validation Perplexity</text>
+<line x1="70" y1="360" x2="870" y2="360" stroke="#222" stroke-width="1.5"/>
+<line x1="70" y1="40" x2="70" y2="360" stroke="#222" stroke-width="1.5"/>
+<line x1="70.00" y1="360" x2="70.00" y2="366" stroke="#444" stroke-width="1"/>
+<text x="70.00" y="382" text-anchor="middle" font-size="11" font-family="monospace">1</text>
+<line x1="870.00" y1="360" x2="870.00" y2="366" stroke="#444" stroke-width="1"/>
+<text x="870.00" y="382" text-anchor="middle" font-size="11" font-family="monospace">2</text>
+<line x1="64" y1="360.00" x2="70" y2="360.00" stroke="#444" stroke-width="1"/>
+<line x1="70" y1="360.00" x2="870" y2="360.00" stroke="#e5e5e5" stroke-width="1"/>
+<text x="60" y="364.00" text-anchor="end" font-size="11" font-family="monospace">24.105</text>
+<line x1="64" y1="280.00" x2="70" y2="280.00" stroke="#444" stroke-width="1"/>
+<line x1="70" y1="280.00" x2="870" y2="280.00" stroke="#e5e5e5" stroke-width="1"/>
+<text x="60" y="284.00" text-anchor="end" font-size="11" font-family="monospace">31.074</text>
+<line x1="64" y1="200.00" x2="70" y2="200.00" stroke="#444" stroke-width="1"/>
+<line x1="70" y1="200.00" x2="870" y2="200.00" stroke="#e5e5e5" stroke-width="1"/>
+<text x="60" y="204.00" text-anchor="end" font-size="11" font-family="monospace">38.043</text>
+<line x1="64" y1="120.00" x2="70" y2="120.00" stroke="#444" stroke-width="1"/>
+<line x1="70" y1="120.00" x2="870" y2="120.00" stroke="#e5e5e5" stroke-width="1"/>
+<text x="60" y="124.00" text-anchor="end" font-size="11" font-family="monospace">45.012</text>
+<line x1="64" y1="40.00" x2="70" y2="40.00" stroke="#444" stroke-width="1"/>
+<line x1="70" y1="40.00" x2="870" y2="40.00" stroke="#e5e5e5" stroke-width="1"/>
+<text x="60" y="44.00" text-anchor="end" font-size="11" font-family="monospace">51.981</text>
+<polyline fill="none" stroke="#1f77b4" stroke-width="2.5" points="70.00,239.64 870.00,337.93"/>
+<circle cx="70.00" cy="239.64" r="2.8" fill="#1f77b4"/>
+<circle cx="870.00" cy="337.93" r="2.8" fill="#1f77b4"/>
+<line x1="78" y1="48" x2="96" y2="48" stroke="#1f77b4" stroke-width="2.5"/>
+<text x="102" y="52" font-size="11" font-family="monospace">teacher</text>
+<polyline fill="none" stroke="#d62728" stroke-width="2.5" points="70.00,84.52 870.00,182.85"/>
+<circle cx="70.00" cy="84.52" r="2.8" fill="#d62728"/>
+<circle cx="870.00" cy="182.85" r="2.8" fill="#d62728"/>
+<line x1="78" y1="66" x2="96" y2="66" stroke="#d62728" stroke-width="2.5"/>
+<text x="102" y="70" font-size="11" font-family="monospace">scratch</text>
+<polyline fill="none" stroke="#2ca02c" stroke-width="2.5" points="70.00,62.07 870.00,156.06"/>
+<circle cx="70.00" cy="62.07" r="2.8" fill="#2ca02c"/>
+<circle cx="870.00" cy="156.06" r="2.8" fill="#2ca02c"/>
+<line x1="78" y1="84" x2="96" y2="84" stroke="#2ca02c" stroke-width="2.5"/>
+<text x="102" y="88" font-size="11" font-family="monospace">distill</text>
+<text x="450.0" y="402" text-anchor="middle" font-size="12" font-family="monospace">epoch</text>
+</svg>
