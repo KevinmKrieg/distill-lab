@@ -26,6 +26,8 @@ class CausalTransformerLM(nn.Module):
         super().__init__()
         d_model = config["d_model"]
         ff_dim = d_model * config.get("ff_mult", 4)
+        self.hidden_size = d_model
+        self.vocab_size = vocab_size
         self.token_embedding = nn.Embedding(vocab_size, d_model)
         self.position_encoding = PositionalEncoding(d_model, max_seq_len)
         layer = nn.TransformerEncoderLayer(

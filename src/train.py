@@ -10,9 +10,33 @@ from torch import nn
 
 from src.data import create_dataloaders
 from src.eval import evaluate_model
+from src.hf_teacher import HFCausalLMTeacher
 from src.losses import distillation_loss, masked_language_model_loss
 from src.models import build_model
 from src.utils import append_jsonl, ensure_dir, load_config, pick_device, save_config, set_seed
+
+
+def build_teacher_for_distillation(config: Dict, vocab_size: int, max_seq_len: int, device: torch.device) -> nn.Module:
+    distill_cfg = config["distillation"]
+    teacher_source = distill_cfg.get("teacher_source", "local")
+
+    if teacher_source == "huggingface":
+        teacher_cfg = distill_cfg["teacher_hf"]
+        teacher = HFCausalLMTeacher.from_pretrained(teacher_cfg, device)
+        if teacher.vocab_size != vocab_size:
+            raise ValueError(
+                "Teacher vocab size does not match student/data vocab size. "
+                "When using a Hugging Face teacher, set `data.tokenizer.level: hf` with the same tokenizer family."
+            )
+        return teacher
+
+    teacher = build_model(vocab_size, max_seq_len, config["teacher_model"]).to(device)
+    checkpoint = torch.load(distill_cfg["teacher_checkpoint"], map_location=device)
+    teacher.load_state_dict(checkpoint["model_state"])
+    teacher.eval()
+    for parameter in teacher.parameters():
+        parameter.requires_grad = False
+    return teacher
 
 
 def build_training_stack(config: Dict, loaders: Dict, device: torch.device) -> Tuple[nn.Module, Optional[nn.Module], Optional[nn.Module]]:
@@ -22,18 +46,12 @@ def build_training_stack(config: Dict, loaders: Dict, device: torch.device) -> T
 
     if mode == "distill":
         student = build_model(vocab_size, max_seq_len, config["student_model"]).to(device)
-        teacher = build_model(vocab_size, max_seq_len, config["teacher_model"]).to(device)
-        checkpoint = torch.load(config["distillation"]["teacher_checkpoint"], map_location=device)
-        teacher.load_state_dict(checkpoint["model_state"])
-        teacher.eval()
-        for parameter in teacher.parameters():
-            parameter.requires_grad = False
-
+        teacher = build_teacher_for_distillation(config, vocab_size, max_seq_len, device)
         hidden_projector = None
         if config["distillation"]["hidden_loss_weight"] > 0.0:
             hidden_projector = nn.Linear(
                 config["student_model"]["d_model"],
-                config["teacher_model"]["d_model"],
+                teacher.hidden_size,
             ).to(device)
         return student, teacher, hidden_projector
 
@@ -89,7 +107,12 @@ def train_one_epoch(
         outputs = model(input_ids, attention_mask)
         if teacher is None:
             loss = masked_language_model_loss(outputs["logits"], labels, pad_id)
-            metrics = {"loss": loss.detach(), "kl": torch.zeros((), device=device), "ce": loss.detach(), "hidden_mse": torch.zeros((), device=device)}
+            metrics = {
+                "loss": loss.detach(),
+                "kl": torch.zeros((), device=device),
+                "ce": loss.detach(),
+                "hidden_mse": torch.zeros((), device=device),
+            }
         else:
             with torch.no_grad():
                 teacher_outputs = teacher(input_ids, attention_mask)
@@ -136,7 +159,7 @@ def main() -> None:
     loaders = create_dataloaders(config)
     output_dir = ensure_dir(config["output_dir"])
     metrics_path = output_dir / "metrics.jsonl"
-    save_config(output_dir / 'run_config.yaml', config)
+    save_config(output_dir / "run_config.yaml", config)
 
     model, teacher, hidden_projector = build_training_stack(config, loaders, device)
     params = list(model.parameters())

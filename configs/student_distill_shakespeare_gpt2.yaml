@@ -1,0 +1,41 @@
+seed: 42
+output_dir: results/student_distill_shakespeare_gpt2
+
+data:
+  type: text
+  name: tiny_shakespeare
+  train_path: data/tiny_shakespeare/train.txt
+  val_path: data/tiny_shakespeare/val.txt
+  batch_size: 16
+  max_seq_len: 96
+  stride: 48
+  num_workers: 0
+  tokenizer:
+    level: hf
+    pretrained_model_name_or_path: gpt2
+    use_fast: true
+    add_eos_token: true
+
+student_model:
+  d_model: 128
+  n_heads: 4
+  n_layers: 2
+  ff_mult: 4
+  dropout: 0.1
+
+training:
+  mode: distill
+  epochs: 8
+  lr: 0.0003
+  weight_decay: 0.01
+  grad_clip: 1.0
+  log_every: 20
+
+distillation:
+  teacher_source: huggingface
+  temperature: 2.0
+  alpha: 0.8
+  hidden_loss_weight: 0.01
+  teacher_hf:
+    model_name_or_path: gpt2
+    use_fast: true

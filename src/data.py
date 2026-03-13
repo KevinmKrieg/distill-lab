@@ -11,6 +11,11 @@ from typing import Dict, List, Sequence
 import torch
 from torch.utils.data import DataLoader, Dataset
 
+try:
+    from transformers import AutoTokenizer
+except Exception:  # pragma: no cover - handled at runtime
+    AutoTokenizer = None
+
 
 SPECIAL_TOKENS = ["<pad>", "<bos>", "<eos>", "<unk>"]
 BYTE_TOKEN_OFFSET = 256
@@ -42,6 +47,7 @@ class Batch:
 class BaseTokenizer:
     def __init__(self, vocab: Dict[str, int]) -> None:
         self.vocab = vocab
+        self.vocab_size = len(vocab)
         self.pad_id = vocab["<pad>"]
         self.bos_id = vocab["<bos>"]
         self.eos_id = vocab["<eos>"]
@@ -200,6 +206,55 @@ class BPETokenizer(BaseTokenizer):
         return [self.vocab.get(f"bpe:{token_id}", self.unk_id) for token_id in sequence]
 
 
+class HFAutoTokenizerWrapper:
+    def __init__(self, tokenizer, source_name: str, add_bos_token: bool = False, add_eos_token: bool = True) -> None:
+        self.tokenizer = tokenizer
+        self.source_name = source_name
+        self.add_bos_token = add_bos_token
+        self.add_eos_token = add_eos_token
+        if tokenizer.pad_token_id is None:
+            if tokenizer.eos_token is not None:
+                tokenizer.pad_token = tokenizer.eos_token
+            else:
+                tokenizer.add_special_tokens({"pad_token": "<|pad|>"})
+        self.pad_id = int(tokenizer.pad_token_id)
+        self.bos_id = tokenizer.bos_token_id
+        self.eos_id = tokenizer.eos_token_id
+        self.unk_id = tokenizer.unk_token_id if tokenizer.unk_token_id is not None else self.pad_id
+        self.vocab_size = len(tokenizer)
+        self.vocab = tokenizer.get_vocab()
+
+    @classmethod
+    def from_pretrained(cls, config: Dict) -> "HFAutoTokenizerWrapper":
+        if AutoTokenizer is None:
+            raise ImportError("transformers is required for Hugging Face tokenization. Install it with `pip install transformers`.")
+        source_name = config.get("pretrained_model_name_or_path") or config.get("model_name_or_path")
+        if source_name is None:
+            raise ValueError("HF tokenizer config requires `pretrained_model_name_or_path` or `model_name_or_path`.")
+        tokenizer = AutoTokenizer.from_pretrained(
+            source_name,
+            use_fast=config.get("use_fast", True),
+            cache_dir=config.get("cache_dir"),
+            revision=config.get("revision"),
+            trust_remote_code=config.get("trust_remote_code", False),
+            local_files_only=config.get("local_files_only", False),
+        )
+        return cls(
+            tokenizer=tokenizer,
+            source_name=source_name,
+            add_bos_token=config.get("add_bos_token", False),
+            add_eos_token=config.get("add_eos_token", True),
+        )
+
+    def encode(self, text: str) -> List[int]:
+        token_ids = self.tokenizer.encode(text, add_special_tokens=False)
+        if self.add_bos_token and self.bos_id is not None:
+            token_ids = [int(self.bos_id)] + token_ids
+        if self.add_eos_token and self.eos_id is not None:
+            token_ids = token_ids + [int(self.eos_id)]
+        return [int(token_id) for token_id in token_ids]
+
+
 class SequenceDataset(Dataset):
     def __init__(self, sequences: Sequence[Sequence[int]]) -> None:
         self.sequences = list(sequences)
@@ -262,6 +317,7 @@ def build_toy_sequences(config: Dict) -> Dict[str, object]:
         "train_sequences": [encode_sentence(sentence) for sentence in train_sentences],
         "val_sequences": [encode_sentence(sentence) for sentence in val_sentences],
         "vocab": vocab,
+        "vocab_size": len(vocab),
         "pad_id": vocab["<pad>"],
         "tokenizer_name": "toy-word",
         "dataset_name": "synthetic_templates",
@@ -273,7 +329,7 @@ def read_text_lines(path: str) -> List[str]:
     return [line.strip() for line in lines if line.strip()]
 
 
-def build_tokenizer(tokenizer_cfg: Dict, train_texts: Sequence[str]) -> BaseTokenizer:
+def build_tokenizer(tokenizer_cfg: Dict, train_texts: Sequence[str]):
     level = tokenizer_cfg.get("level", "char")
     if level == "char":
         return CharTokenizer.from_texts(train_texts, max_vocab_size=tokenizer_cfg.get("max_vocab_size"))
@@ -296,6 +352,8 @@ def build_tokenizer(tokenizer_cfg: Dict, train_texts: Sequence[str]) -> BaseToke
             min_frequency=min_frequency,
             model_path=model_path,
         )
+    if level == "hf":
+        return HFAutoTokenizerWrapper.from_pretrained(tokenizer_cfg)
     raise ValueError(f"Unsupported tokenizer level: {level}")
 
 
@@ -331,7 +389,16 @@ def build_text_sequences(config: Dict) -> Dict[str, object]:
     max_seq_len = data_cfg["max_seq_len"]
 
     def encode_document(text: str) -> List[int]:
-        return [tokenizer.bos_id] + tokenizer.encode(text) + [tokenizer.eos_id]
+        token_ids = tokenizer.encode(text)
+        if tokenizer_cfg.get("level") == "hf":
+            return token_ids
+        sequence: List[int] = []
+        if getattr(tokenizer, "bos_id", None) is not None:
+            sequence.append(int(tokenizer.bos_id))
+        sequence.extend(token_ids)
+        if getattr(tokenizer, "eos_id", None) is not None:
+            sequence.append(int(tokenizer.eos_id))
+        return sequence
 
     train_sequences: List[List[int]] = []
     for text in train_texts:
@@ -347,9 +414,10 @@ def build_text_sequences(config: Dict) -> Dict[str, object]:
     return {
         "train_sequences": train_sequences,
         "val_sequences": val_sequences,
-        "vocab": tokenizer.vocab,
-        "pad_id": tokenizer.pad_id,
-        "tokenizer_name": tokenizer_cfg.get("level", "char"),
+        "vocab": getattr(tokenizer, "vocab", {}),
+        "vocab_size": int(tokenizer.vocab_size),
+        "pad_id": int(tokenizer.pad_id),
+        "tokenizer_name": tokenizer_cfg.get("level", "char") if tokenizer_cfg.get("level") != "hf" else f"hf:{tokenizer.source_name}",
         "dataset_name": data_cfg.get("name", Path(data_cfg["train_path"]).parent.name or "text_corpus"),
     }
 
@@ -402,7 +470,7 @@ def create_dataloaders(config: Dict) -> Dict[str, object]:
         "train": train_loader,
         "val": val_loader,
         "vocab": dataset_bundle["vocab"],
-        "vocab_size": len(dataset_bundle["vocab"]),
+        "vocab_size": dataset_bundle["vocab_size"],
         "pad_id": dataset_bundle["pad_id"],
         "dataset_name": dataset_bundle["dataset_name"],
         "tokenizer_name": dataset_bundle["tokenizer_name"],
