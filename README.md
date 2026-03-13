@@ -49,6 +49,21 @@ python -m src.train --config configs/student_scratch_tinystories_bpe.yaml
 python -m src.train --config configs/student_distill_tinystories_bpe.yaml
 ```
 
+### 4. Add latency and memory to the comparison table
+
+After you have trained one or more runs, benchmark their saved `best.pt` checkpoints:
+
+```bash
+python scripts/benchmark_runs.py \
+  results/teacher_shakespeare_bpe \
+  results/student_scratch_shakespeare_bpe \
+  results/student_distill_shakespeare_bpe \
+  --labels teacher scratch distill \
+  --output-dir results/reports/shakespeare_bpe_bench
+```
+
+This writes a `benchmark.json` file into each run directory and a comparison table with latency, throughput, and memory columns.
+
 ## Open-source model use case
 
 The intended next step is distilling a pretrained open model such as `gpt2` or a SmolLM-style teacher into a smaller custom student on WikiText-2 or TinyStories. This repo already has the reusable pieces for that workflow:

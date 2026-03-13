@@ -5,9 +5,11 @@ import json
 import math
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List, Sequence
+from typing import Dict, List, Sequence
 
 import torch
+
+from src.benchmarking import load_benchmark
 
 
 @dataclass
@@ -21,6 +23,12 @@ class RunSummary:
     final_train_loss: float
     parameter_count: int
     checkpoint_size_mb: float
+    average_batch_latency_ms: float | None = None
+    average_sample_latency_ms: float | None = None
+    average_token_latency_us: float | None = None
+    tokens_per_second: float | None = None
+    peak_device_memory_mb: float | None = None
+    peak_process_rss_mb: float | None = None
 
 
 @dataclass
@@ -57,6 +65,7 @@ def summarize_run(run_dir: Path, label: str | None = None) -> RunHistory:
     checkpoint_path = run_dir / "best.pt"
     if not checkpoint_path.exists():
         raise FileNotFoundError(f"Missing checkpoint: {checkpoint_path}")
+    benchmark = load_benchmark(run_dir / "benchmark.json") or {}
 
     summary = RunSummary(
         label=label or run_dir.name,
@@ -68,8 +77,20 @@ def summarize_run(run_dir: Path, label: str | None = None) -> RunHistory:
         final_train_loss=float(rows[-1]["train_loss"]),
         parameter_count=count_model_parameters(checkpoint_path),
         checkpoint_size_mb=checkpoint_path.stat().st_size / (1024 * 1024),
+        average_batch_latency_ms=benchmark.get("average_batch_latency_ms"),
+        average_sample_latency_ms=benchmark.get("average_sample_latency_ms"),
+        average_token_latency_us=benchmark.get("average_token_latency_us"),
+        tokens_per_second=benchmark.get("tokens_per_second"),
+        peak_device_memory_mb=benchmark.get("peak_device_memory_mb"),
+        peak_process_rss_mb=benchmark.get("peak_process_rss_mb"),
     )
     return RunHistory(label=summary.label, run_dir=run_dir, rows=rows, summary=summary)
+
+
+def fmt(value: float | None, digits: int = 4) -> str:
+    if value is None:
+        return ""
+    return f"{value:.{digits}f}"
 
 
 def write_summary_csv(histories: Sequence[RunHistory], output_path: Path) -> None:
@@ -87,6 +108,12 @@ def write_summary_csv(histories: Sequence[RunHistory], output_path: Path) -> Non
                 "final_train_loss",
                 "parameter_count",
                 "checkpoint_size_mb",
+                "average_batch_latency_ms",
+                "average_sample_latency_ms",
+                "average_token_latency_us",
+                "tokens_per_second",
+                "peak_device_memory_mb",
+                "peak_process_rss_mb",
             ],
         )
         writer.writeheader()
@@ -98,11 +125,17 @@ def write_summary_csv(histories: Sequence[RunHistory], output_path: Path) -> Non
                     "run_dir": str(summary.run_dir),
                     "epochs": summary.epochs,
                     "best_epoch": summary.best_epoch,
-                    "best_val_perplexity": f"{summary.best_val_perplexity:.4f}",
-                    "best_val_token_accuracy": f"{summary.best_val_token_accuracy:.4f}",
-                    "final_train_loss": f"{summary.final_train_loss:.4f}",
+                    "best_val_perplexity": fmt(summary.best_val_perplexity),
+                    "best_val_token_accuracy": fmt(summary.best_val_token_accuracy),
+                    "final_train_loss": fmt(summary.final_train_loss),
                     "parameter_count": summary.parameter_count,
-                    "checkpoint_size_mb": f"{summary.checkpoint_size_mb:.3f}",
+                    "checkpoint_size_mb": fmt(summary.checkpoint_size_mb, 3),
+                    "average_batch_latency_ms": fmt(summary.average_batch_latency_ms, 3),
+                    "average_sample_latency_ms": fmt(summary.average_sample_latency_ms, 3),
+                    "average_token_latency_us": fmt(summary.average_token_latency_us, 3),
+                    "tokens_per_second": fmt(summary.tokens_per_second, 2),
+                    "peak_device_memory_mb": fmt(summary.peak_device_memory_mb, 3),
+                    "peak_process_rss_mb": fmt(summary.peak_process_rss_mb, 3),
                 }
             )
 
@@ -110,22 +143,22 @@ def write_summary_csv(histories: Sequence[RunHistory], output_path: Path) -> Non
 def write_summary_markdown(histories: Sequence[RunHistory], output_path: Path) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     header = (
-        "| run | epochs | best epoch | best val ppl | best val acc | final train loss | params | ckpt mb |\n"
+        "| run | best val ppl | val acc | params | batch ms | tok/s | device mem mb | rss mb |\n"
         "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n"
     )
     rows = []
     for history in histories:
         summary = history.summary
         rows.append(
-            "| {label} | {epochs} | {best_epoch} | {ppl:.4f} | {acc:.4f} | {loss:.4f} | {params} | {ckpt:.3f} |".format(
+            "| {label} | {ppl} | {acc} | {params} | {batch_ms} | {tps} | {device_mem} | {rss} |".format(
                 label=summary.label,
-                epochs=summary.epochs,
-                best_epoch=summary.best_epoch,
-                ppl=summary.best_val_perplexity,
-                acc=summary.best_val_token_accuracy,
-                loss=summary.final_train_loss,
+                ppl=fmt(summary.best_val_perplexity),
+                acc=fmt(summary.best_val_token_accuracy),
                 params=summary.parameter_count,
-                ckpt=summary.checkpoint_size_mb,
+                batch_ms=fmt(summary.average_batch_latency_ms, 3) or "n/a",
+                tps=fmt(summary.tokens_per_second, 2) or "n/a",
+                device_mem=fmt(summary.peak_device_memory_mb, 3) or "n/a",
+                rss=fmt(summary.peak_process_rss_mb, 3) or "n/a",
             )
         )
     output_path.write_text(header + "\n".join(rows) + "\n", encoding="utf-8")

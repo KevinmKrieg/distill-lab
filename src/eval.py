@@ -59,6 +59,19 @@ def resolve_model_config(checkpoint: Dict, fallback_config: Dict, model_key: str
     return fallback_config[model_key]
 
 
+def load_model_from_checkpoint(config: Dict, checkpoint_path: str, device: torch.device, model_key: str = "model"):
+    loaders = create_dataloaders(config)
+    checkpoint = torch.load(checkpoint_path, map_location=device)
+    model_config = resolve_model_config(checkpoint, config, model_key)
+    model = build_model(
+        vocab_size=loaders["vocab_size"],
+        max_seq_len=config["data"]["max_seq_len"] - 1,
+        config=model_config,
+    ).to(device)
+    model.load_state_dict(checkpoint["model_state"])
+    return model, loaders
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Evaluate a saved language model checkpoint.")
     parser.add_argument("--config", required=True, help="Path to a YAML config.")
@@ -69,17 +82,9 @@ def main() -> None:
     config = load_config(args.config)
     set_seed(config["seed"])
     device = pick_device()
-    loaders = create_dataloaders(config)
 
     checkpoint_path = args.checkpoint or str(Path(config["output_dir"]) / "best.pt")
-    checkpoint = torch.load(checkpoint_path, map_location=device)
-    model_config = resolve_model_config(checkpoint, config, args.model_key)
-    model = build_model(
-        vocab_size=loaders["vocab_size"],
-        max_seq_len=config["data"]["max_seq_len"] - 1,
-        config=model_config,
-    ).to(device)
-    model.load_state_dict(checkpoint["model_state"])
+    model, loaders = load_model_from_checkpoint(config, checkpoint_path, device, args.model_key)
 
     perplexity, accuracy = evaluate_model(model, loaders["val"], device, loaders["pad_id"])
     metrics = {

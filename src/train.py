@@ -12,7 +12,7 @@ from src.data import create_dataloaders
 from src.eval import evaluate_model
 from src.losses import distillation_loss, masked_language_model_loss
 from src.models import build_model
-from src.utils import append_jsonl, ensure_dir, load_config, pick_device, set_seed
+from src.utils import append_jsonl, ensure_dir, load_config, pick_device, save_config, set_seed
 
 
 def build_training_stack(config: Dict, loaders: Dict, device: torch.device) -> Tuple[nn.Module, Optional[nn.Module], Optional[nn.Module]]:
@@ -136,6 +136,7 @@ def main() -> None:
     loaders = create_dataloaders(config)
     output_dir = ensure_dir(config["output_dir"])
     metrics_path = output_dir / "metrics.jsonl"
+    save_config(output_dir / 'run_config.yaml', config)
 
     model, teacher, hidden_projector = build_training_stack(config, loaders, device)
     params = list(model.parameters())
@@ -194,4 +195,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

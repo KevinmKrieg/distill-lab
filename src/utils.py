@@ -14,6 +14,13 @@ def load_config(path: str) -> Dict:
         return yaml.safe_load(handle)
 
 
+def save_config(path: str | Path, config: Dict) -> None:
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with open(target, "w", encoding="utf-8") as handle:
+        yaml.safe_dump(config, handle, sort_keys=False)
+
+
 def set_seed(seed: int) -> None:
     random.seed(seed)
     torch.manual_seed(seed)
@@ -38,4 +45,3 @@ def pick_device() -> torch.device:
     if torch.backends.mps.is_available():
         return torch.device("mps")
     return torch.device("cpu")
-
